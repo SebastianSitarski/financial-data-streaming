@@ -7,6 +7,9 @@ spring:
     locale-resolver: fixed
   kafka:
     bootstrap-servers: localhost:9092
+    admin:
+      # the app owns its topic: apply retention changes to a topic that already exists
+      modify-topic-configs: true
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       # Jackson 3 based (Spring Kafka 4); JsonSerializer needs Jackson 2, which is not on the runtime classpath
@@ -14,6 +17,8 @@ spring:
       properties:
         # send() blocks the WebSocket receive thread while the broker is unreachable; keep that short
         max.block.ms: 2000
+        # the topic carries one event type; consumers know it from configuration, not from a class-name header
+        spring.json.add.type.headers: false
     consumer:
       # default group for consumers that do not declare their own; MarketUpdateListener sets its own
       group-id: financial-data-streaming
@@ -24,8 +29,8 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
-        # matched as an exact package (no sub-packages): the package that holds the Kafka event records
-        spring.json.trusted.packages: com.financialdata.streaming.stream
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.financialdata.streaming.stream.MarketUpdate
 
 binance:
   base-url: https://data-api.binance.vision
@@ -49,6 +54,8 @@ market-data:
     name: crypto.market-updates
     partitions: 3
     replication-factor: 1
+    # tickers are superseded every second; history only slows down a cold start
+    retention: 1h
 
 management:
   endpoints:

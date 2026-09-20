@@ -1,6 +1,7 @@
 package com.financialdata.streaming.market;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -36,7 +37,7 @@ class LiveMarketControllerTest {
         @Bean
         MarketDataProperties marketDataProperties() {
             return new MarketDataProperties(List.of("BTCUSDT", "ETHUSDT"), "market-update-processor",
-                    new MarketDataProperties.Topic("crypto.market-updates", 3, (short) 1));
+                    new MarketDataProperties.Topic("crypto.market-updates", 3, (short) 1, Duration.ofHours(1)));
         }
     }
 

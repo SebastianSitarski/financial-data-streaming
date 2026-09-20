@@ -188,6 +188,9 @@ public class BinanceMarketStreamClient implements SmartLifecycle {
         public void afterConnectionEstablished(WebSocketSession newSession) {
             session.set(newSession);
             connectedAt = clock.instant();
+            // the container reports the open session before execute()'s future completes; from here on the
+            // open session is what blocks duplicate connects, so an immediate close may already reconnect
+            connecting.set(false);
             log.info("Binance market stream connected ({} symbols)", symbolCount);
         }
 

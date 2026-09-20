@@ -1,6 +1,7 @@
 package com.financialdata.streaming.stream;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
@@ -28,7 +30,7 @@ class MarketUpdatePublisherTest {
 
     private MarketUpdatePublisher publisher() {
         return new MarketUpdatePublisher(kafkaTemplate, new MarketDataProperties(List.of("BTCUSDT"),
-                "market-update-processor", new MarketDataProperties.Topic("crypto.market-updates", 3, (short) 1)));
+                "market-update-processor", new MarketDataProperties.Topic("crypto.market-updates", 3, (short) 1, Duration.ofHours(1))));
     }
 
     @Test
@@ -39,6 +41,15 @@ class MarketUpdatePublisherTest {
         publisher().publish(UPDATE);
 
         verify(kafkaTemplate).send("crypto.market-updates", "BTCUSDT", UPDATE);
+    }
+
+    @Test
+    void synchronousProducerFailureIsLoggedNotPropagated() {
+        when(kafkaTemplate.send("crypto.market-updates", "BTCUSDT", UPDATE))
+                .thenThrow(new KafkaException("Send failed", new org.apache.kafka.common.errors.TimeoutException(
+                        "Topic crypto.market-updates not present in metadata after 2000 ms.")));
+
+        assertThatNoException().isThrownBy(() -> publisher().publish(UPDATE));
     }
 
     @Test

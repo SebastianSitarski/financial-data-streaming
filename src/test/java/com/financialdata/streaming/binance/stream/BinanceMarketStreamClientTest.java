@@ -68,7 +68,7 @@ class BinanceMarketStreamClientTest {
                 Duration.ofSeconds(10), "wss://binance.test",
                 new BinanceProperties.Stream(true, Duration.ofSeconds(1), Duration.ofSeconds(8), Duration.ofSeconds(30)));
         MarketDataProperties marketData = new MarketDataProperties(List.of("BTCUSDT", "ETHUSDT"),
-                "market-update-processor", new MarketDataProperties.Topic("crypto.market-updates", 3, (short) 1));
+                "market-update-processor", new MarketDataProperties.Topic("crypto.market-updates", 3, (short) 1, Duration.ofHours(1)));
         client = new BinanceMarketStreamClient(webSocketClient, new BinanceTickerMapper(JsonMapper.builder().build()),
                 publisher, binance, marketData, scheduler, clock);
     }
@@ -168,6 +168,25 @@ class BinanceMarketStreamClientTest {
         verify(scheduler, times(3)).schedule(any(Runnable.class), at.capture());
         assertThat(at.getAllValues()).containsExactly(
                 START.plusSeconds(1), START.plusSeconds(2), START.plusSeconds(30).plusSeconds(1));
+    }
+
+    @Test
+    void closeBeforeConnectFutureCompletesStillReconnects() throws Exception {
+        // Tomcat reports onOpen (and possibly onClose) before StandardWebSocketClient completes its future
+        CompletableFuture<WebSocketSession> neverCompleted = new CompletableFuture<>();
+        when(webSocketClient.execute(any(WebSocketHandler.class), anyString())).thenAnswer(invocation -> {
+            WebSocketHandler handler = invocation.getArgument(0);
+            handler.afterConnectionEstablished(session);
+            return neverCompleted;
+        });
+        ArgumentCaptor<Runnable> reconnect = stubScheduler();
+        client.start();
+        WebSocketHandler handler = latestHandler();
+
+        handler.afterConnectionClosed(session, CloseStatus.SERVER_ERROR);
+        reconnect.getValue().run();
+
+        verify(webSocketClient, times(2)).execute(any(WebSocketHandler.class), eq(STREAM_URL));
     }
 
     @Test

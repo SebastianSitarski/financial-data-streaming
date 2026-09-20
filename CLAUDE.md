@@ -29,8 +29,11 @@ com.financialdata.streaming
 * Live pipeline: Binance combined `@ticker` WebSocket → `MarketUpdate` → Kafka `crypto.market-updates`
   (key = symbol, at-least-once) → `LatestMarketDataStore` → `GET /api/crypto/{symbol}/live`.
 * Kafka JSON uses Spring Kafka's **Jackson 3** `JacksonJsonSerializer`/`JacksonJsonDeserializer`
-  (wrapped in `ErrorHandlingDeserializer`). The older `JsonSerializer`/`JsonDeserializer` need Jackson 2,
-  which is only on the *test* classpath — do not use them.
+  (wrapped in `ErrorHandlingDeserializer`), without type headers: the consumer's value type comes from
+  `spring.json.value.default.type`. The older `JsonSerializer`/`JsonDeserializer` need Jackson 2, which is
+  only on the *test* classpath — do not use them.
+* The live consumer uses `auto.offset.reset=latest` and the topic has a 1h retention: it is a latest-state
+  pipeline, replaying history is never desirable.
 * WebSocket client: Spring `StandardWebSocketClient` over embedded Tomcat (already in `pom.xml`); the
   stream is disabled in tests via `binance.stream.enabled=false`.
 * Tests: plain JUnit 5 + AssertJ for logic, `@WebMvcTest` for controllers, `MockRestServiceServer`

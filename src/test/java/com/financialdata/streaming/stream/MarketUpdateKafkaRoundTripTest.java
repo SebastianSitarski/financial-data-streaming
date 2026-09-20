@@ -5,16 +5,20 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.kafka.test.utils.ContainerTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The one Kafka behavior unit tests cannot prove: the configured serializer, deserializer, type headers
- * and trusted packages actually round-trip a {@link MarketUpdate} from publisher to listener.
+ * The one Kafka behavior unit tests cannot prove: the configured serializer, deserializer and value type
+ * (no type headers) actually round-trip a {@link MarketUpdate} from publisher to listener.
  */
 @SpringBootTest(properties = "binance.stream.enabled=false")
 @EmbeddedKafka(partitions = 1, bootstrapServersProperty = "spring.kafka.bootstrap-servers")
@@ -27,6 +31,20 @@ class MarketUpdateKafkaRoundTripTest {
 
     @Autowired
     private LatestMarketDataStore store;
+
+    @Autowired
+    private KafkaListenerEndpointRegistry registry;
+
+    @Autowired
+    private MarketDataProperties properties;
+
+    @BeforeEach
+    void waitForPartitionAssignment() {
+        // the listener starts from the latest offset, so a record published before assignment would be skipped
+        for (MessageListenerContainer container : registry.getListenerContainers()) {
+            ContainerTestUtils.waitForAssignment(container, properties.topic().partitions());
+        }
+    }
 
     @Test
     void publishedUpdateIsConsumedIntoTheLatestStateStore() throws InterruptedException {

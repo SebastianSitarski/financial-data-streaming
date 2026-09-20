@@ -59,6 +59,7 @@ REST-only without opening the Binance WebSocket.
 | `binance.stream.stable-after` | `30s`                          | Connection age after which the back-off resets |
 | `market-data.symbols`     | `BTCUSDT, ETHUSDT, SOLUSDT`        | Symbols subscribed on the ticker stream (case-insensitive) |
 | `market-data.topic.name` / `partitions` / `replication-factor` | `crypto.market-updates` / `3` / `1` | Kafka topic for `MarketUpdate` events |
+| `market-data.topic.retention` | `1h`                           | Topic retention; tickers are superseded every second, so history only slows a cold start |
 | `market-data.consumer-group` | `market-update-processor`       | Consumer group that feeds the live store |
 | `spring.kafka.bootstrap-servers` | `localhost:9092`            | Kafka broker (Docker Compose)      |
 
@@ -148,7 +149,11 @@ com.financialdata.streaming
 Live pipeline semantics:
 
 - **Delivery**: at-least-once. Spring Kafka commits offsets after each processed batch (`AckMode.BATCH`,
-  auto-commit disabled). Duplicates only re-apply the same state.
+  auto-commit disabled). Duplicates only re-apply the same state. A consumer group without committed
+  offsets starts from the **latest** record (`auto.offset.reset=latest` on the listener) — replaying
+  retained history would only serve stale state as "live" until the consumer caught up.
+- **Contract**: JSON without type headers; the consumer knows the value type from configuration
+  (`spring.json.value.default.type`), so renaming the Java class never invalidates records in the topic.
 - **Ordering**: the Kafka key is the symbol, so all updates of one symbol share a partition and arrive in
   order; there is no ordering between symbols. `LatestMarketDataStore` additionally ignores an update
   whose `eventTime` is older than the stored one.
