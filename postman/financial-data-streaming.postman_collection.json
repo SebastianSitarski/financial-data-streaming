@@ -1,0 +1,678 @@
+{
+  "info": {
+    "_postman_id": "1d075303-9728-51d7-a0e3-8daeaad0fab3",
+    "name": "financial-data-streaming",
+    "description": "Binance public market-data REST integration exposed by the application.\n\nVariables: `baseUrl` (default http://localhost:8080), `symbol` (default BTCUSDT).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "symbol",
+      "value": "BTCUSDT"
+    }
+  ],
+  "item": [
+    {
+      "name": "Market data",
+      "item": [
+        {
+          "name": "Current price",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}/price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}",
+                "price"
+              ]
+            },
+            "description": "Binance: GET /api/v3/ticker/price"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"symbol matches\", () => pm.expect(body.symbol).to.eql(pm.variables.get(\"symbol\").toUpperCase()));",
+                  "pm.test(\"price is a positive number\", () => pm.expect(body.price).to.be.a(\"number\").above(0));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Market information",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}"
+              ]
+            },
+            "description": "Combines Binance exchangeInfo and ticker/price"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"has base and quote asset\", () => { pm.expect(body.baseAsset).to.be.a(\"string\"); pm.expect(body.quoteAsset).to.be.a(\"string\"); });",
+                  "pm.test(\"has status\", () => pm.expect(body.status).to.be.a(\"string\"));",
+                  "pm.test(\"price is a positive number\", () => pm.expect(body.price).to.be.a(\"number\").above(0));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "24h statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}",
+                "stats"
+              ]
+            },
+            "description": "Binance: GET /api/v3/ticker/24hr"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"has all stats fields\", () => pm.expect(body).to.have.all.keys(\"symbol\",\"lastPrice\",\"priceChange\",\"priceChangePercent\",\"highPrice\",\"lowPrice\",\"volume\"));",
+                  "pm.test(\"high >= low\", () => pm.expect(body.highPrice).to.be.at.least(body.lowPrice));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Candles (1h, limit 100)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}/candles?interval=1h&limit=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}",
+                "candles"
+              ],
+              "query": [
+                {
+                  "key": "interval",
+                  "value": "1h"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Binance: GET /api/v3/klines"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"returns 100 candles\", () => pm.expect(body).to.be.an(\"array\").with.lengthOf(100));",
+                  "pm.test(\"candle has OHLCV fields\", () => pm.expect(body[0]).to.have.all.keys(\"openTime\",\"open\",\"high\",\"low\",\"close\",\"volume\"));",
+                  "pm.test(\"openTime is ISO-8601\", () => pm.expect(new Date(body[0].openTime).toISOString()).to.eql(body[0].openTime));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Candles (defaults)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}/candles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}",
+                "candles"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"defaults to 100 candles\", () => pm.expect(body).to.be.an(\"array\").with.lengthOf(100));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Candles (1d, limit 7)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}/candles?interval=1d&limit=7",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}",
+                "candles"
+              ],
+              "query": [
+                {
+                  "key": "interval",
+                  "value": "1d"
+                },
+                {
+                  "key": "limit",
+                  "value": "7"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"returns 7 candles\", () => pm.expect(body).to.have.lengthOf(7));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Symbol normalization",
+      "item": [
+        {
+          "name": "Lowercase symbol",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/btcusdt/price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "btcusdt",
+                "price"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"symbol normalized to uppercase\", () => pm.expect(body.symbol).to.eql(\"BTCUSDT\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Mixed-case symbol",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/EthUsdt",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "EthUsdt"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"symbol normalized to uppercase\", () => pm.expect(body.symbol).to.eql(\"ETHUSDT\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error handling",
+      "item": [
+        {
+          "name": "Unknown symbol -> 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/BTCXYZ/price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "BTCXYZ",
+                "price"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404\", () => pm.response.to.have.status(404));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code CRYPTO_SYMBOL_NOT_FOUND\", () => pm.expect(body.code).to.eql(\"CRYPTO_SYMBOL_NOT_FOUND\"));",
+                  "pm.test(\"message present\", () => pm.expect(body.message).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"message names the symbol\", () => pm.expect(body.message).to.include(\"BTCXYZ\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Malformed symbol -> 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/INVALID_SYMBOL/price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "INVALID_SYMBOL",
+                "price"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code INVALID_REQUEST\", () => pm.expect(body.code).to.eql(\"INVALID_REQUEST\"));",
+                  "pm.test(\"message present\", () => pm.expect(body.message).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Unsupported interval -> 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}/candles?interval=7h",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}",
+                "candles"
+              ],
+              "query": [
+                {
+                  "key": "interval",
+                  "value": "7h"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code INVALID_REQUEST\", () => pm.expect(body.code).to.eql(\"INVALID_REQUEST\"));",
+                  "pm.test(\"message present\", () => pm.expect(body.message).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Limit above 1000 -> 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}/candles?limit=1001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}",
+                "candles"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "1001"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code INVALID_REQUEST\", () => pm.expect(body.code).to.eql(\"INVALID_REQUEST\"));",
+                  "pm.test(\"message present\", () => pm.expect(body.message).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Limit below 1 -> 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}/candles?limit=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}",
+                "candles"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code INVALID_REQUEST\", () => pm.expect(body.code).to.eql(\"INVALID_REQUEST\"));",
+                  "pm.test(\"message present\", () => pm.expect(body.message).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Non-numeric limit -> 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}/candles?limit=many",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}",
+                "candles"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "many"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code INVALID_REQUEST\", () => pm.expect(body.code).to.eql(\"INVALID_REQUEST\"));",
+                  "pm.test(\"message present\", () => pm.expect(body.message).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Operations",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"status UP\", () => pm.expect(body.status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ]
+}
