@@ -4,6 +4,7 @@ import java.util.stream.Collectors;
 
 import com.financialdata.streaming.market.CryptoSymbolNotFoundException;
 import com.financialdata.streaming.market.InvalidRequestException;
+import com.financialdata.streaming.market.LiveMarketDataNotAvailableException;
 import com.financialdata.streaming.market.MarketDataRateLimitedException;
 import com.financialdata.streaming.market.MarketDataUnavailableException;
 import org.slf4j.Logger;
@@ -38,6 +39,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleSymbolNotFound(CryptoSymbolNotFoundException ex) {
         return new ErrorResponse("CRYPTO_SYMBOL_NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(LiveMarketDataNotAvailableException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleLiveDataNotAvailable(LiveMarketDataNotAvailableException ex) {
+        return new ErrorResponse("LIVE_DATA_NOT_AVAILABLE", ex.getMessage());
     }
 
     @ExceptionHandler(InvalidRequestException.class)

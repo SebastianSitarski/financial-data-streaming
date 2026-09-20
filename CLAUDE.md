@@ -18,14 +18,24 @@ structure, configuration, build tooling, or existing conventions.
 
 ```
 com.financialdata.streaming
-├── market    Controller, service, application models (records), MarketDataProvider port, domain exceptions
-├── binance   BinanceMarketDataClient (implements MarketDataProvider), transport DTOs, kline mapper, config
-└── web       Shared error response and @RestControllerAdvice
+├── market            REST controllers (snapshot + /live), service, application models, domain exceptions
+├── binance           BinanceMarketDataClient (REST adapter, implements MarketDataProvider), DTOs, kline mapper
+│   └── stream        BinanceMarketStreamClient (WebSocket, SmartLifecycle, reconnect), ticker DTOs, mapper
+├── stream            MarketUpdate event, MarketUpdatePublisher/Listener, NewTopic config, LatestMarketDataStore
+└── web               Shared error response and @RestControllerAdvice
 ```
 
 * `market` knows nothing about Binance; new data sources are new adapters, not changes in `market`.
+* Live pipeline: Binance combined `@ticker` WebSocket → `MarketUpdate` → Kafka `crypto.market-updates`
+  (key = symbol, at-least-once) → `LatestMarketDataStore` → `GET /api/crypto/{symbol}/live`.
+* Kafka JSON uses Spring Kafka's **Jackson 3** `JacksonJsonSerializer`/`JacksonJsonDeserializer`
+  (wrapped in `ErrorHandlingDeserializer`). The older `JsonSerializer`/`JsonDeserializer` need Jackson 2,
+  which is only on the *test* classpath — do not use them.
+* WebSocket client: Spring `StandardWebSocketClient` over embedded Tomcat (already in `pom.xml`); the
+  stream is disabled in tests via `binance.stream.enabled=false`.
 * Tests: plain JUnit 5 + AssertJ for logic, `@WebMvcTest` for controllers, `MockRestServiceServer`
-  for the Binance client. `@SpringBootTest` is used only for the context-loads smoke test.
+  for the Binance REST client, mocked `WebSocketClient`/`TaskScheduler` + controllable `Clock` for the
+  stream client. `@SpringBootTest` (+`@EmbeddedKafka`) is used only for the context-loads smoke test.
 * Configuration lives in `src/main/resources/application.yml` (`binance.*` bound via
   `@ConfigurationProperties` record `BinanceProperties`).
 * Postman collection in `postman/`.
