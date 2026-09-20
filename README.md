@@ -120,7 +120,9 @@ single `WARN` line (full stack trace at `DEBUG`) so an outage does not flood the
 ## Postman
 
 `postman/` contains a collection and a local environment covering the main success,
-normalization and error cases, each with response assertions:
+normalization and error cases, each with response assertions. The *Live market data* folder
+exercises `/live` (needs Kafka and the Binance stream up; its assertions require `eventTime` to be
+less than two minutes old, so they prove the pipeline is actually flowing):
 
 - `financial-data-streaming.postman_collection.json`
 - `local.postman_environment.json` (`baseUrl=http://localhost:8080`, `symbol=BTCUSDT`)
