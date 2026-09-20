@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "1d075303-9728-51d7-a0e3-8daeaad0fab3",
     "name": "financial-data-streaming",
-    "description": "Binance public market-data REST integration exposed by the application.\n\nVariables: `baseUrl` (default http://localhost:8080), `symbol` (default BTCUSDT).",
+    "description": "Binance market data exposed by the application.\n\n- **Market data** — REST snapshots forwarded to the Binance public REST API.\n- **Live market data** — latest ticker per configured symbol from the streaming pipeline (Binance WebSocket -> Kafka -> consumer -> in-memory store); needs Kafka running.\n\nVariables: `baseUrl` (default http://localhost:8080), `symbol` (default BTCUSDT).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -272,6 +272,176 @@
                   "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
                   "pm.test(\"returns 7 candles\", () => pm.expect(body).to.have.lengthOf(7));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Live market data (WebSocket -> Kafka)",
+      "description": "Latest ticker per symbol that travelled Binance WebSocket -> Kafka (crypto.market-updates) -> consumer -> in-memory store. Never calls Binance REST.\n\nRequires Kafka (docker compose up -d) and binance.stream.enabled=true. Right after startup expect 404 LIVE_DATA_NOT_AVAILABLE (\"No live update has been received yet\") for a second or two until the first ticker arrives.",
+      "item": [
+        {
+          "name": "Live ticker",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/{{symbol}}/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "{{symbol}}",
+                "live"
+              ]
+            },
+            "description": "Binance: <symbol>@ticker stream via Kafka. Run twice a few seconds apart to see eventTime advance."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"symbol matches\", () => pm.expect(body.symbol).to.eql(pm.variables.get(\"symbol\").toUpperCase()));",
+                  "pm.test(\"eventTime is an ISO-8601 instant\", () => pm.expect(body.eventTime).to.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$/));",
+                  "pm.test(\"eventTime is recent (pipeline is live)\", () => pm.expect(Date.now() - Date.parse(body.eventTime)).to.be.below(120000));",
+                  "pm.test(\"prices are positive numbers\", () => { for (const f of [\"lastPrice\", \"highPrice\", \"lowPrice\", \"volume\"]) pm.expect(body[f], f).to.be.a(\"number\").above(0); });",
+                  "pm.test(\"change fields are numbers\", () => { pm.expect(body.priceChange).to.be.a(\"number\"); pm.expect(body.priceChangePercent).to.be.a(\"number\"); });",
+                  "pm.test(\"low <= last <= high\", () => { pm.expect(body.lastPrice).to.be.at.least(body.lowPrice); pm.expect(body.lastPrice).to.be.at.most(body.highPrice); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Live ticker (lowercase symbol)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/btcusdt/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "btcusdt",
+                "live"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"symbol normalized to upper case\", () => pm.expect(pm.response.json().symbol).to.eql(\"BTCUSDT\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Live ticker ETHUSDT",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/ETHUSDT/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "ETHUSDT",
+                "live"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"symbol is ETHUSDT\", () => pm.expect(body.symbol).to.eql(\"ETHUSDT\"));",
+                  "pm.test(\"eventTime is recent\", () => pm.expect(Date.now() - Date.parse(body.eventTime)).to.be.below(120000));",
+                  "pm.test(\"lastPrice is a positive number\", () => pm.expect(body.lastPrice).to.be.a(\"number\").above(0));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Live ticker SOLUSDT",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/SOLUSDT/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "SOLUSDT",
+                "live"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"symbol is SOLUSDT\", () => pm.expect(body.symbol).to.eql(\"SOLUSDT\"));",
+                  "pm.test(\"eventTime is recent\", () => pm.expect(Date.now() - Date.parse(body.eventTime)).to.be.below(120000));",
+                  "pm.test(\"lastPrice is a positive number\", () => pm.expect(body.lastPrice).to.be.a(\"number\").above(0));"
                 ]
               }
             }
@@ -610,6 +780,86 @@
                   "key": "limit",
                   "value": "many"
                 }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code INVALID_REQUEST\", () => pm.expect(body.code).to.eql(\"INVALID_REQUEST\"));",
+                  "pm.test(\"message present\", () => pm.expect(body.message).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Live: unsubscribed symbol -> 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/DOGEUSDT/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "DOGEUSDT",
+                "live"
+              ]
+            },
+            "description": "DOGEUSDT is not in market-data.symbols, so no live state can ever exist for it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404\", () => pm.response.to.have.status(404));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code LIVE_DATA_NOT_AVAILABLE\", () => pm.expect(body.code).to.eql(\"LIVE_DATA_NOT_AVAILABLE\"));",
+                  "pm.test(\"message says the symbol is not subscribed\", () => pm.expect(body.message).to.include(\"DOGEUSDT\").and.include(\"not part of the live subscriptions\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Live: malformed symbol -> 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crypto/BTC-USDT/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crypto",
+                "BTC-USDT",
+                "live"
               ]
             },
             "description": ""

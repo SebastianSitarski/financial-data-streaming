@@ -7,22 +7,55 @@ spring:
     locale-resolver: fixed
   kafka:
     bootstrap-servers: localhost:9092
+    admin:
+      # the app owns its topic: apply retention changes to a topic that already exists
+      modify-topic-configs: true
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # Jackson 3 based (Spring Kafka 4); JsonSerializer needs Jackson 2, which is not on the runtime classpath
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        # send() blocks the WebSocket receive thread while the broker is unreachable; keep that short
+        max.block.ms: 2000
+        # the topic carries one event type; consumers know it from configuration, not from a class-name header
+        spring.json.add.type.headers: false
     consumer:
+      # default group for consumers that do not declare their own; MarketUpdateListener sets its own
       group-id: financial-data-streaming
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      # a record that cannot be deserialized is reported (and skipped by DefaultErrorHandler) instead of
+      # blocking the partition forever
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
-        spring.json.trusted.packages: com.financialdata.streaming
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.financialdata.streaming.stream.MarketUpdate
 
 binance:
   base-url: https://data-api.binance.vision
   connect-timeout: 5s
   read-timeout: 10s
-  ws-url: wss://stream.binance.com:9443/ws
+  # public market-data-only WebSocket host; combined streams are opened under /stream
+  ws-url: wss://data-stream.binance.vision
+  stream:
+    enabled: true
+    initial-backoff: 1s
+    max-backoff: 60s
+    stable-after: 30s
+
+market-data:
+  symbols:
+    - BTCUSDT
+    - ETHUSDT
+    - SOLUSDT
+  consumer-group: market-update-processor
+  topic:
+    name: crypto.market-updates
+    partitions: 3
+    replication-factor: 1
+    # tickers are superseded every second; history only slows down a cold start
+    retention: 1h
 
 management:
   endpoints:
